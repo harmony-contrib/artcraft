@@ -13,13 +13,13 @@ use crate::ui::icons::{self, Icon};
 use crate::ui::widgets;
 
 /// Home: what ArtCraft does and where to start. Returns a page to open.
-pub fn home(ui: &mut Ui, signed_in: bool, requests: &mut Vec<AppRequest>) -> Option<Page> {
+pub fn home(ui: &mut Ui, signed_in: bool, requests: &mut Vec<AppRequest>, app_name: &str) -> Option<Page> {
   let mut open = None;
   let area = ui.max_rect();
   let width = (area.width() - 64.0).min(960.0);
   let mut col = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(pos2(area.center().x - width / 2.0, area.top() + 56.0), vec2(width, area.height() - 56.0))));
   let ui = &mut col;
-  widgets::hud(ui, "01 / ArtCraft", theme::FAINT);
+  widgets::hud(ui, &format!("01 / {app_name}"), theme::FAINT);
   ui.add_space(10.0);
   ui.label(widgets::heading("Capable tools for artists.", 52.0));
   ui.add_space(10.0);

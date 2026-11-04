@@ -189,5 +189,15 @@ fn install_fonts(ctx: &egui::Context) {
     stack.extend(fallback.iter().cloned());
     fonts.families.insert(family, stack);
   }
+  #[cfg(target_env = "ohos")]
+  for (name, path) in [("HarmonyOS Sans SC", "/system/fonts/HarmonyOS_Sans_SC.ttf"), ("HarmonyOS Sans TC", "/system/fonts/HarmonyOS_Sans_TC.ttf"), ("HarmonyOS Sans", "/system/fonts/HarmonyOS_Sans.ttf")] {
+    if let Ok(bytes) = std::fs::read(path) {
+      fonts.font_data.insert(name.to_owned(), Arc::new(FontData::from_owned(bytes)));
+      // Include CJK in every custom weight/display family as well as the default families.
+      for stack in fonts.families.values_mut() {
+        stack.push(name.to_owned());
+      }
+    }
+  }
   ctx.set_fonts(fonts);
 }

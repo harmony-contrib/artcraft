@@ -5,7 +5,9 @@
 
 pub mod accounts;
 pub mod jobs;
+#[cfg(not(target_env = "ohos"))]
 pub mod submit;
+#[cfg(not(target_env = "ohos"))]
 pub mod worker;
 
 use serde::{Deserialize, Serialize};
@@ -48,6 +50,7 @@ impl Provider {
   /// The providers `model_id` can run on, the default first (`ImageModels.ts`,
   /// `buildModelsFromListing.ts`): fal for four ArtCraft models, Midjourney directly for
   /// Midjourney's.
+  #[cfg(not(target_env = "ohos"))]
   pub fn for_model(model_id: &str) -> &'static [Provider] {
     match model_id {
       "flux_1_dev" | "flux_1_schnell" | "nano_banana_2" | "nano_banana_pro" => &[Provider::Artcraft, Provider::Fal],
@@ -55,6 +58,12 @@ impl Provider {
       "midjourney_7" | "midjourney_7_niji" | "midjourney_8" => &[Provider::Artcraft, Provider::Midjourney],
       _ => &[Provider::Artcraft],
     }
+  }
+
+  /// The shared router uses desktop-only HTTP clients; OHOS uses the ArtCraft API.
+  #[cfg(target_env = "ohos")]
+  pub fn for_model(_model_id: &str) -> &'static [Provider] {
+    &[Provider::Artcraft]
   }
 
   /// `picked` if `model_id` runs there, else the model's default.
@@ -88,6 +97,7 @@ pub fn is_midjourney(model_id: &str) -> bool {
 mod tests {
   use super::*;
 
+  #[cfg(not(target_env = "ohos"))]
   #[test]
   fn models_offer_their_providers_default_first() {
     assert_eq!(Provider::for_model("nano_banana_pro"), [Provider::Artcraft, Provider::Fal]);

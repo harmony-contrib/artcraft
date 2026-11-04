@@ -14,7 +14,7 @@ const CLOSE_RED: Color32 = Color32::from_rgb(0xc4, 0x2b, 0x1c);
 
 /// Whether this platform draws its own title bar buttons (macOS keeps the traffic lights).
 pub fn custom_caption_buttons() -> bool {
-  !cfg!(target_os = "macos")
+  !cfg!(any(target_os = "macos", target_env = "ohos"))
 }
 
 /// Space to leave at the title bar's left for macOS's traffic lights.
@@ -29,6 +29,9 @@ pub fn leading_inset() -> f32 {
 /// Dragging the title bar's empty space moves the window; double-clicking maximizes or restores.
 /// Call before drawing the title bar's controls so they stay on top.
 pub fn title_bar_drag(ui: &mut Ui) {
+  if cfg!(target_env = "ohos") {
+    return;
+  }
   let r = ui.max_rect();
   let rect = Rect::from_min_max(r.min + vec2(RESIZE_EDGE, RESIZE_EDGE), r.max - vec2(RESIZE_EDGE, 0.0));
   let resp = ui.interact(rect, ui.id().with("title-bar-drag"), Sense::click_and_drag());

@@ -332,6 +332,7 @@ pub fn attach_from_library(refs: &mut References, kind: RefKind, slot: ImageSlot
 }
 
 /// Asks the user for files of `kinds` (`multiple` for decks).
+#[cfg(not(target_env = "ohos"))]
 pub fn pick_files(kinds: &[RefKind], multiple: bool) -> Vec<PathBuf> {
   let mut dialog = rfd::FileDialog::new();
   for kind in kinds {
@@ -401,4 +402,10 @@ impl CostState {
       self.credits = credits;
     }
   }
+}
+
+#[cfg(target_env = "ohos")]
+pub fn pick_files(_kinds: &[RefKind], _multiple: bool) -> Vec<PathBuf> {
+  log::warn!("Native file picking is unavailable on OpenHarmony; use references from the library");
+  Vec::new()
 }

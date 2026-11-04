@@ -143,6 +143,7 @@ pub fn show(ui: &mut Ui, prompt: &mut String, refs: &References, state: &mut Pro
   let rect = response.response.rect;
   expand_toggle(ui, props.id, rect, state);
   drop_target(ui, props, rect, &mut actions);
+  #[cfg(not(target_env = "ohos"))]
   paste_images(ui, props, &mut actions);
   if state.fullscreen {
     focus_mode(ui.ctx(), prompt, refs, state, props, cache, slots, &mut actions);
@@ -303,6 +304,7 @@ fn drop_target(ui: &mut Ui, props: &PromptBoxProps<'_>, rect: Rect, actions: &mu
 
 /// Ctrl/Cmd+V with an image on the clipboard. egui only forwards text pastes, so this watches for
 /// the V key's release and reads the image itself.
+#[cfg(not(target_env = "ohos"))]
 fn paste_images(ui: &mut Ui, props: &PromptBoxProps<'_>, actions: &mut Vec<PromptBoxAction>) {
   if props.accepts.is_empty() {
     return;

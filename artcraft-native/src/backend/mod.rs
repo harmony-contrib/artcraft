@@ -1,10 +1,12 @@
 //! Everything that talks to the ArtCraft API. Calls run on a tokio runtime and report back as
 //! [`Event`]s, which the UI drains once per frame; nothing here blocks the UI thread.
 
+#[cfg_attr(target_env = "ohos", path = "audio_ohos.rs")]
 pub mod audio;
 pub mod media_cache;
 pub mod providers;
 pub mod session;
+#[cfg(not(target_env = "ohos"))]
 pub mod video;
 pub mod wire;
 
@@ -30,6 +32,7 @@ use artcraft_client::error::storyteller_error::StorytellerError;
 use artcraft_client::utils::api_host::ApiHost;
 use artcraft_client::utils::basic_json_post_request::basic_json_post_request;
 use artcraft_client::utils::login_challenge_client::{LoginChallengeClient, LoginChallengeClientError};
+#[cfg(not(target_env = "ohos"))]
 use cookie_store_wrapper::cookie_store::CookieStore;
 use enums::common::payments_namespace::PaymentsNamespace;
 use log::{error, warn};
@@ -42,7 +45,9 @@ use crate::models::{self, ModelInfo};
 use providers::Provider;
 use providers::accounts::ProviderAccounts;
 use providers::jobs::{JobStore, ProviderJob};
+#[cfg(not(target_env = "ohos"))]
 use providers::submit::SubmitError;
+#[cfg(not(target_env = "ohos"))]
 use providers::worker::Worker;
 use session::Credentials;
 use wire::{AudioModels, BatchMedia, CharactersPage, MediaFile, PromptResponse, SessionInfo, SessionJobs, SessionUser, UploadResponse, UserMediaList};
@@ -201,15 +206,15 @@ pub struct Backend {
 }
 
 impl Backend {
-  pub fn new(ctx: egui::Context) -> Self {
+  pub fn new(ctx: egui::Context, root: PathBuf) -> Self {
     let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(4).thread_name("artcraft-io").enable_all().build().expect("tokio runtime");
     let (tx, rx) = channel();
-    let root = session::data_root();
     let host = session::api_host(&root);
     let creds = session::load(&root);
     let http = reqwest::Client::builder().user_agent(USER_AGENT).gzip(true).timeout(Duration::from_secs(60)).build().unwrap_or_default();
     let (accounts, jobs) = (ProviderAccounts::load(&root), JobStore::load(&root));
     let creds = Arc::new(RwLock::new(creds));
+    #[cfg(not(target_env = "ohos"))]
     rt.spawn(Worker { host: host.clone(), creds: creds.clone(), http: http.clone(), accounts: accounts.clone(), jobs: jobs.clone(), tx: tx.clone(), ctx: ctx.clone() }.run());
     Self { rt, ctx, tx, rx, host, root, creds, http, device_login_cancel: Arc::new(AtomicBool::new(false)), accounts, jobs }
   }
@@ -309,9 +314,12 @@ impl Backend {
         },
       };
       let _ = tx.send(Event::DeviceLogin { url: challenge.verification_url.clone(), code: challenge.confirmation_code.clone() });
+      #[cfg(not(target_env = "ohos"))]
       if let Err(err) = open::that(&challenge.verification_url) {
         warn!("Couldn't open the browser: {err}");
       }
+      #[cfg(target_env = "ohos")]
+      this.ctx.open_url(egui::OpenUrl::new_tab(&challenge.verification_url));
       let interval = Duration::from_secs(u64::from(challenge.poll_interval_seconds.max(1)));
       loop {
         tokio::time::sleep(interval).await;
@@ -440,6 +448,7 @@ impl Backend {
   // --- Other providers ---------------------------------------------------------------------
 
   /// Starts an image generation at Midjourney or fal; `image_urls` are the references' links.
+  #[cfg(not(target_env = "ohos"))]
   pub fn generate_with_provider(&self, provider: Provider, fields: Map<String, Value>, image_urls: Vec<String>, meta: EnqueueMeta) {
     let (api, accounts, jobs) = (self.api(), self.accounts.clone(), self.jobs.clone());
     self.spawn(move |tx| async move {
@@ -457,6 +466,12 @@ impl Backend {
         },
       }
     });
+  }
+
+  #[cfg(target_env = "ohos")]
+  pub fn generate_with_provider(&self, _provider: Provider, _fields: Map<String, Value>, _image_urls: Vec<String>, _meta: EnqueueMeta) {
+    let _ = self.tx.send(Event::EnqueueFailed { modality: Modality::Image, message: "Direct provider accounts are unavailable on OpenHarmony. Select ArtCraft as the provider.".to_owned(), status: None });
+    self.ctx.request_repaint();
   }
 
   /// What an image generation costs at `provider`: nothing extra for direct Midjourney (it uses
@@ -493,6 +508,7 @@ impl Backend {
   }
 
   /// Keeps the Midjourney login captured by the sign-in window.
+  #[cfg(not(target_env = "ohos"))]
   pub fn save_midjourney_login(&self, cookies: CookieStore) {
     let accounts = self.accounts.clone();
     self.spawn(move |tx| async move {
@@ -503,6 +519,7 @@ impl Backend {
     });
   }
 
+  #[cfg(not(target_env = "ohos"))]
   pub fn disconnect_midjourney(&self) {
     let accounts = self.accounts.clone();
     self.spawn(move |tx| async move {

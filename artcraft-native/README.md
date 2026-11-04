@@ -25,6 +25,60 @@ The workspace's default member is the Tauri app, so pass `-p artcraft_native`.
   or a username and password.
 - **API host.** `~/Artcraft/settings/env_configs.json` selects it, exactly as for the Tauri app.
 
+## Embedding on OpenHarmony
+
+The `artcraft_native` library and `artcraft-native` desktop binary share the same app. No separate
+OpenHarmony application is needed in this repository. A host such as `visrune-ability` can use:
+
+```toml
+artcraft_native = { git = "https://github.com/harmony-contrib/artcraft.git", branch = "feat-openharmony", default-features = false }
+```
+
+Pin `rev` to a tested commit for production. The consuming workspace must retain the root
+`[patch.crates-io]` entries for egui 0.37 (`richerfu/egui` at
+`42760ab8470178ea3a955a194dad0a3ecadfb26f`) and winit (`richerfu/winit` at
+`fe8cbb2e689b519b9282bc29b84c8ea6bc9df313`): Cargo ignores patches declared by dependencies.
+These pins match the Zaoyu workspace. SVG rendering uses resvg 0.47.
+
+Construct the app in the host's eframe creation callback:
+
+```rust,ignore
+use artcraft_native::{ArtcraftApp, Branding};
+
+let app = ArtcraftApp::with_branding(cc, Branding {
+  name: "Visrune",
+  icon_png: include_bytes!("path/to/visrune.png"),
+  attribution: "Visrune is an independent adaptation of ArtCraft. See bundled notices.",
+}, ability_data_directory);
+// Return Box::new(app) as the host's eframe::App.
+```
+
+The directory must be writable by the ability; session credentials, API configuration and
+provider state live beneath it. The host supplies `cc.storage` for UI preferences (and forwards
+`eframe::App::save` when wrapping the app), and sets its own window title/icon. Hosts managing
+their own egui pass can call `app.show(ctx)` instead of the eframe logic/UI methods and must
+handle egui platform output, including URL opening and clipboard text.
+
+`upstream-branding` is enabled by default for the desktop binary and `ArtcraftApp::new`.
+Disabling it removes the upstream application icon/default identity; the host's name, PNG and
+attribution appear in the title bar, Home and About UI. Service names and API URLs still identify
+ArtCraft. OpenHarmony loads HarmonyOS Sans SC, TC and Sans from `/system/fonts` as fallbacks for
+all UI font families.
+
+On OpenHarmony generation uses the ArtCraft API. Direct Midjourney/fal accounts are unavailable:
+the shared desktop router also depends on wreq/BoringSSL via Kinovi and WorldLabs. The desktop
+router remains unchanged. Audio/video playback is handed to the host's URL handler; desktop
+audio devices, FFmpeg playback, image clipboard reads and native open/save dialogs are excluded.
+References can still be selected from the library. File picking/saving needs a future host
+integration; the OpenHarmony build does not provide those native dialogs.
+
+With the OHOS Rust target and NDK compiler environment installed:
+
+```bash
+CARGO_ENCODED_RUSTFLAGS="$(printf '%s\x1f%s\x1f%s\x1f%s' '-C' 'link-arg=--target=aarch64-linux-ohos' '-C' "link-arg=--sysroot=$OHOS_NDK_HOME/native/sysroot")" \
+  cargo check --target aarch64-unknown-linux-ohos -p artcraft_native --lib --no-default-features
+```
+
 ## Architecture
 
 | Module             | What it does                                                                   |

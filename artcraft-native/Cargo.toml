@@ -5,18 +5,23 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[lib]
+name = "artcraft_native"
+path = "src/lib.rs"
+
+[features]
+default = ["upstream-branding"]
+upstream-branding = []
+
 [[bin]]
 name = "artcraft-native"
 path = "src/main.rs"
+required-features = ["upstream-branding"]
 
 [dependencies]
 # Internal (Tauri-free) API crates shared with the Tauri app.
 artcraft_api_defs.workspace = true
 artcraft_client.workspace = true
-artcraft_router.workspace = true
-cookie_store_wrapper.workspace = true
-fal_client.workspace = true
-midjourney_client.workspace = true
 tokens.workspace = true
 
 # External
@@ -24,24 +29,33 @@ anyhow.workspace = true
 cookie.workspace = true
 chrono.workspace = true
 directories = "6.0.0"
-eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit", "wayland", "x11", "persistence", "links"] }
-egui = "0.36"
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "persistence", "links"] }
+egui = "0.37"
 enums.workspace = true
-egui_extras = { version = "0.36", default-features = false, features = ["image", "svg"] }
+# SVG creator icons are rasterized directly with resvg below; egui_extras/svg pins resvg 0.45.
+egui_extras = { version = "0.37", default-features = false, features = ["image"] }
 env_logger.workspace = true
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 log.workspace = true
-open = "5"
 reqwest = { workspace = true, features = ["multipart"] }
-resvg = "0.45"
-rfd = "0.16"
-rodio = { version = "0.20", default-features = false, features = ["symphonia-all"] }
+resvg = "0.47"
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "fs"] }
 url.workspace = true
 uuid = { workspace = true, features = ["v4"] }
+
+[target.'cfg(not(target_env = "ohos"))'.dependencies]
+# Direct provider routing also pulls in wreq/BoringSSL through Kinovi and WorldLabs.
+artcraft_router.workspace = true
+cookie_store_wrapper.workspace = true
+fal_client.workspace = true
+midjourney_client.workspace = true
+eframe = { version = "0.37", default-features = false, features = ["accesskit", "wayland", "x11"] }
+open = "5"
+rfd = "0.16"
+rodio = { version = "0.20", default-features = false, features = ["symphonia-all"] }
 
 # Pasting images from the clipboard (egui's own clipboard support is text only).
 arboard = { version = "3", default-features = false, features = ["image-data"] }
@@ -50,4 +64,4 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 wry = "0.55"
 
 [dev-dependencies]
-egui_kittest = "0.36"
+egui_kittest = "0.37"

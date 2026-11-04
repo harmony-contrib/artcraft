@@ -6,15 +6,19 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use log::warn;
+#[cfg(not(target_env = "ohos"))]
 use midjourney_client::credentials::credential_manager::MidjourneyCredentialManager;
 
+#[cfg(not(target_env = "ohos"))]
 const MIDJOURNEY_FILENAME: &str = "midjourney_cookies.toml";
 /// The Tauri app's pre-TOML Midjourney state, removed on disconnect so it can't come back.
+#[cfg(not(target_env = "ohos"))]
 const MIDJOURNEY_LEGACY_FILENAME: &str = "midjourney_state.json";
 const FAL_KEY_FILENAME: &str = "fal.api_key.txt";
 
 #[derive(Clone)]
 pub struct ProviderAccounts {
+  #[cfg(not(target_env = "ohos"))]
   pub midjourney: MidjourneyCredentialManager,
   fal_key_path: Arc<PathBuf>,
 }
@@ -25,20 +29,33 @@ impl ProviderAccounts {
     if let Err(err) = std::fs::create_dir_all(&dir) {
       warn!("Couldn't create {}: {err}", dir.display());
     }
-    let (path, legacy) = (dir.join(MIDJOURNEY_FILENAME), vec![dir.join(MIDJOURNEY_LEGACY_FILENAME)]);
-    let midjourney = MidjourneyCredentialManager::load(path.clone(), legacy.clone()).unwrap_or_else(|err| {
-      warn!("Couldn't load the Midjourney login: {err}");
-      MidjourneyCredentialManager::new(path, legacy, None)
-    });
-    Self { midjourney, fal_key_path: Arc::new(dir.join(FAL_KEY_FILENAME)) }
+    #[cfg(not(target_env = "ohos"))]
+    let midjourney = {
+      let (path, legacy) = (dir.join(MIDJOURNEY_FILENAME), vec![dir.join(MIDJOURNEY_LEGACY_FILENAME)]);
+      MidjourneyCredentialManager::load(path.clone(), legacy.clone()).unwrap_or_else(|err| {
+        warn!("Couldn't load the Midjourney login: {err}");
+        MidjourneyCredentialManager::new(path, legacy, None)
+      })
+    };
+    Self {
+      #[cfg(not(target_env = "ohos"))]
+      midjourney,
+      fal_key_path: Arc::new(dir.join(FAL_KEY_FILENAME)),
+    }
   }
 
   /// The connected Midjourney account's email ("" when it's connected but unknown), or `None`.
+  #[cfg(not(target_env = "ohos"))]
   pub fn midjourney_account(&self) -> Option<String> {
     match (self.midjourney.maybe_copy_cookie_store(), self.midjourney.maybe_account_info()) {
       (Ok(None), Ok(None)) | (Err(_), _) | (_, Err(_)) => None,
       (_, Ok(info)) => Some(info.and_then(|i| i.maybe_email).unwrap_or_default()),
     }
+  }
+
+  #[cfg(target_env = "ohos")]
+  pub fn midjourney_account(&self) -> Option<String> {
+    None
   }
 
   pub fn fal_key(&self) -> Option<String> {

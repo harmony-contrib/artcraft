@@ -5,6 +5,7 @@ use egui::{Align2, Color32, FontId, Id, Key, Rect, Sense, Ui, pos2, vec2};
 
 use crate::backend::audio::AudioPlayer;
 use crate::backend::media_cache::{Lookup, MediaCache};
+#[cfg(not(target_env = "ohos"))]
 use crate::backend::video::{self, VideoPlayer};
 use crate::backend::wire::Prompt;
 use crate::feed::grid::ModelNames;
@@ -24,6 +25,7 @@ pub struct Lightbox {
   confirm_delete: bool,
   prompt_expanded: bool,
   /// The in-app player for videos (when FFmpeg is installed).
+  #[cfg(not(target_env = "ohos"))]
   player: Option<VideoPlayer>,
 }
 
@@ -42,7 +44,14 @@ pub enum LightboxAction {
 
 impl Lightbox {
   pub fn new(kind: MediaKind, token: String) -> Self {
-    Self { kind, token, confirm_delete: false, prompt_expanded: false, player: None }
+    Self {
+      kind,
+      token,
+      confirm_delete: false,
+      prompt_expanded: false,
+      #[cfg(not(target_env = "ohos"))]
+      player: None,
+    }
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -90,12 +99,16 @@ impl Lightbox {
   #[allow(clippy::too_many_arguments)]
   fn media(&mut self, ui: &mut Ui, rect: Rect, item: &FeedItem, cache: &mut MediaCache, audio: &mut AudioPlayer, prev: &Option<String>, next: &Option<String>, actions: &mut Vec<LightboxAction>) {
     if item.kind == MediaKind::Audio {
-      self.player = None;
+      #[cfg(not(target_env = "ohos"))]
+      {
+        self.player = None;
+      }
       ui.painter().rect_filled(rect, 0.0, Color32::BLACK);
       audio_panel(ui, rect, item, audio);
       self.nav_buttons(ui, rect, prev, next, actions);
       return;
     }
+    #[cfg(not(target_env = "ohos"))]
     if item.kind == MediaKind::Video && video::ffmpeg_available() {
       if self.player.as_ref().is_none_or(|p| p.url() != item.full_url) {
         self.player = Some(VideoPlayer::new(&item.full_url));
@@ -110,7 +123,10 @@ impl Lightbox {
       self.nav_buttons(ui, rect, prev, next, actions);
       return;
     }
-    self.player = None;
+    #[cfg(not(target_env = "ohos"))]
+    {
+      self.player = None;
+    }
     ui.painter().rect_filled(rect, 0.0, Color32::BLACK);
     let url = if item.kind == MediaKind::Image { Some(item.full_url.as_str()) } else { item.thumbnail.as_deref() };
     match url.map(|u| cache.get(ui.ctx(), u)) {

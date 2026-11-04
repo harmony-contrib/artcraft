@@ -111,7 +111,7 @@ pub enum SettingsAction {
 
 /// The settings dialog (Settings → Misc and Accounts in the webapp). `fal_key` is the key being
 /// typed.
-pub fn settings_dialog(ctx: &egui::Context, enter_to_generate: &mut bool, username: Option<&str>, credits: Option<u64>, accounts: &AccountsView, fal_key: &mut String, data_root: &std::path::Path) -> Option<SettingsAction> {
+pub fn settings_dialog(ctx: &egui::Context, enter_to_generate: &mut bool, username: Option<&str>, credits: Option<u64>, accounts: &AccountsView, fal_key: &mut String, data_root: &std::path::Path, branding: &crate::Branding) -> Option<SettingsAction> {
   let mut action = None;
   let close = widgets::modal(ctx, Id::new("settings"), 520.0, |ui| {
     ui.horizontal(|ui| {
@@ -171,7 +171,11 @@ pub fn settings_dialog(ctx: &egui::Context, enter_to_generate: &mut bool, userna
     ui.add_space(18.0);
     widgets::hud(ui, "About", theme::FAINT);
     ui.add_space(6.0);
-    ui.label(egui::RichText::new(format!("ArtCraft native {}", env!("CARGO_PKG_VERSION"))).size(13.0).color(theme::MUTED));
+    ui.label(egui::RichText::new(format!("{} native {}", branding.name, env!("CARGO_PKG_VERSION"))).size(13.0).color(theme::MUTED));
+    ui.label(egui::RichText::new(branding.attribution).size(12.0).color(theme::MUTED));
+    #[cfg(target_env = "ohos")]
+    ui.label(data_root.display().to_string());
+    #[cfg(not(target_env = "ohos"))]
     if widgets::button(ui, Some(Icon::Folder), "Open data folder", widgets::Kind::Secondary, 0.0, theme::CONTROL_H).clicked() {
       if let Err(err) = open::that(data_root) {
         log::warn!("Couldn't open {}: {err}", data_root.display());

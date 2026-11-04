@@ -2,28 +2,44 @@
 //! Midjourney sign-in window (a system webview, used only to capture the login cookies, like
 //! the Tauri app's), and the accounts rows in Settings.
 
+#[cfg(not(target_env = "ohos"))]
 use std::path::Path;
 
+#[cfg(not(target_env = "ohos"))]
 use cookie_store_wrapper::cookie_store::CookieStore;
-use egui::{Id, Rect, Sense, Ui, vec2};
+use egui::{Id, Ui};
+#[cfg(not(target_env = "ohos"))]
+use egui::{Rect, Sense, vec2};
+#[cfg(not(target_env = "ohos"))]
 use log::warn;
+#[cfg(not(target_env = "ohos"))]
 use midjourney_client::credentials::cookie_store_has_auth_cookies::cookie_store_has_auth_cookies;
+#[cfg(not(target_env = "ohos"))]
 use midjourney_client::utils::midjourney_browser_profile::MIDJOURNEY_USER_AGENT;
+#[cfg(not(target_env = "ohos"))]
 use url::Url;
+#[cfg(not(target_env = "ohos"))]
 use wry::raw_window_handle::HasWindowHandle;
+#[cfg(not(target_env = "ohos"))]
 use wry::{WebContext, WebView, WebViewBuilder};
 
 use crate::backend::providers::Provider;
 use crate::overlays::account::text_field;
 use crate::theme;
-use crate::ui::icons::{self, Icon};
+use crate::ui::icons::Icon;
+#[cfg(not(target_env = "ohos"))]
+use crate::ui::icons;
 use crate::ui::widgets;
 
+#[cfg(not(target_env = "ohos"))]
 const MIDJOURNEY_URL: &str = "https://www.midjourney.com/";
 /// The login cookies live on both hosts.
+#[cfg(not(target_env = "ohos"))]
 const MIDJOURNEY_ORIGINS: [&str; 2] = ["https://www.midjourney.com/", "https://midjourney.com/"];
 /// How often the sign-in window is checked for the login cookies.
+#[cfg(not(target_env = "ohos"))]
 const COOKIE_CHECK_SECS: f64 = 2.0;
+#[cfg(not(target_env = "ohos"))]
 const LOGIN_WIDTH: f32 = 560.0;
 
 /// What the setup dialog asks for.
@@ -91,6 +107,7 @@ pub enum AccountAction {
 }
 
 /// The provider accounts in Settings (`MidjourneyAccountBlock`, plus the fal key).
+#[cfg(not(target_env = "ohos"))]
 pub fn accounts_section(ui: &mut Ui, view: &AccountsView, fal_key: &mut String) -> Option<AccountAction> {
   let mut action = None;
   let detail = match view.midjourney.as_deref() {
@@ -126,6 +143,7 @@ pub fn accounts_section(ui: &mut Ui, view: &AccountsView, fal_key: &mut String) 
 }
 
 /// A mono label over a detail line, with its button at the right. Returns the button's click.
+#[cfg(not(target_env = "ohos"))]
 fn account_row(ui: &mut Ui, label: &str, detail: &str, button: impl FnOnce(&mut Ui) -> bool) -> bool {
   ui.horizontal(|ui| {
     ui.vertical(|ui| {
@@ -140,6 +158,7 @@ fn account_row(ui: &mut Ui, label: &str, detail: &str, button: impl FnOnce(&mut 
 
 /// The Midjourney sign-in window: a webview over a modal, checked every two seconds for the
 /// login cookies (both auth tokens), which it hands back once present.
+#[cfg(not(target_env = "ohos"))]
 pub struct MidjourneyLogin {
   context: WebContext,
   webview: Option<WebView>,
@@ -148,11 +167,13 @@ pub struct MidjourneyLogin {
 }
 
 /// What came of the sign-in window.
+#[cfg(not(target_env = "ohos"))]
 pub enum LoginEvent {
   Captured(CookieStore),
   Closed,
 }
 
+#[cfg(not(target_env = "ohos"))]
 impl MidjourneyLogin {
   /// The window keeps its own browser profile under the data folder.
   pub fn new(data_root: &Path) -> Self {
@@ -233,6 +254,7 @@ impl MidjourneyLogin {
 }
 
 /// The login cookies, once the page is on Midjourney and both auth tokens are set.
+#[cfg(not(target_env = "ohos"))]
 fn login_cookies(webview: &WebView) -> Option<CookieStore> {
   let host = webview.url().ok().and_then(|u| Url::parse(&u).ok()).and_then(|u| u.host_str().map(str::to_owned))?;
   log::debug!("The Midjourney sign-in window is on {host}");
@@ -255,7 +277,14 @@ fn login_cookies(webview: &WebView) -> Option<CookieStore> {
   cookie_store_has_auth_cookies(&store).then_some(store)
 }
 
+#[cfg(not(target_env = "ohos"))]
 fn physical_bounds(rect: Rect, pixels_per_point: f32) -> wry::Rect {
   let r = rect * pixels_per_point;
   wry::Rect { position: wry::dpi::PhysicalPosition::new(r.left().round() as i32, r.top().round() as i32).into(), size: wry::dpi::PhysicalSize::new(r.width().round().max(1.0) as u32, r.height().round().max(1.0) as u32).into() }
+}
+
+#[cfg(target_env = "ohos")]
+pub fn accounts_section(ui: &mut Ui, _view: &AccountsView, _fal_key: &mut String) -> Option<AccountAction> {
+  ui.label("Direct provider accounts are unavailable on OpenHarmony. Generations use ArtCraft.");
+  None
 }

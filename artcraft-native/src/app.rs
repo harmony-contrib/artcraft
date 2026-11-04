@@ -3,6 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use std::path::PathBuf;
+
+use crate::Branding;
 
 use egui::{Id, Ui};
 use serde::{Deserialize, Serialize};
@@ -21,7 +24,9 @@ use crate::overlays::account::{LoginAction, LoginDialog, SettingsAction, setting
 use crate::overlays::characters::{CharactersAction, CharactersModal};
 use crate::overlays::library_picker::{LibraryPicker, PickerAction};
 use crate::overlays::lightbox::{Lightbox, LightboxAction, fit_inside};
-use crate::overlays::providers::{AccountAction, AccountsView, LoginEvent, MidjourneyLogin, SetupAction, setup_dialog};
+use crate::overlays::providers::{AccountAction, AccountsView, SetupAction, setup_dialog};
+#[cfg(not(target_env = "ohos"))]
+use crate::overlays::providers::{LoginEvent, MidjourneyLogin};
 use crate::pages::common::{self, AppRequest, Env, FeedKey};
 use crate::pages::create_audio::{AudioSettings, CreateAudioPage};
 use crate::pages::create_image::{CreateImagePage, ImageSettings};
@@ -31,7 +36,7 @@ use crate::prompt_box::refs::{RefKind, RefMedia, References};
 use crate::shell::{self, Account, FeedToggles, Page, ShellAction};
 use crate::theme;
 use crate::ui::toast::Toasts;
-use crate::ui::{creator_icons, widgets, window};
+use crate::ui::{widgets, window};
 
 /// Builds the page environment from the app's fields (disjoint borrows, so pages can be
 /// borrowed mutably alongside it).
@@ -71,6 +76,8 @@ impl Default for Saved {
 }
 
 pub struct ArtcraftApp {
+  branding: Branding,
+  brand_icon: egui::TextureHandle,
   backend: Backend,
   cache: MediaCache,
   player: AudioPlayer,
@@ -106,6 +113,7 @@ pub struct ArtcraftApp {
   settings_open: bool,
   /// "Set up {provider}", after generating needed an account that isn't connected.
   provider_setup: Option<Provider>,
+  #[cfg(not(target_env = "ohos"))]
   midjourney_login: Option<MidjourneyLogin>,
   /// The fal key being typed (setup dialog and Settings).
   fal_key_input: String,
@@ -118,21 +126,79 @@ pub struct ArtcraftApp {
 }
 
 impl ArtcraftApp {
+  /// Creates the standalone upstream application with its usual data directory.
+  #[cfg(feature = "upstream-branding")]
   pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    Self::with_branding(cc, Branding::UPSTREAM, crate::backend::session::data_root())
+  }
+
+  /// Creates an embedded application. `data_root` holds sessions, settings and provider jobs.
+  /// The host owns egui preference storage (`cc.storage`) and the native window's title/icon.
+  pub fn with_branding(cc: &eframe::CreationContext<'_>, branding: Branding, data_root: impl Into<PathBuf>) -> Self {
     theme::apply(&cc.egui_ctx);
     egui_extras::install_image_loaders(&cc.egui_ctx);
     let mut saved: Saved = cc.storage.and_then(|s| eframe::get_value(s, STORAGE_KEY)).unwrap_or_default();
     if let Some(page) = std::env::var("ARTCRAFT_PAGE").ok().and_then(|p| Page::from_slug(&p)) {
       saved.page = page;
     }
-    let backend = Backend::new(cc.egui_ctx.clone());
+    let brand_image = image::load_from_memory(branding.icon_png)
+      .ok()
+      .map(|image| {
+        let rgba = image.into_rgba8();
+        egui::ColorImage::from_rgba_unmultiplied([rgba.width() as usize, rgba.height() as usize], rgba.as_raw())
+      })
+      .unwrap_or_else(|| egui::ColorImage::filled([1, 1], egui::Color32::TRANSPARENT));
+    let brand_icon = cc.egui_ctx.load_texture("app-branding", brand_image, egui::TextureOptions::LINEAR);
+    let backend = Backend::new(cc.egui_ctx.clone(), data_root.into());
     let cache = MediaCache::new(backend.runtime(), backend.http());
     let player = AudioPlayer::new(backend.runtime(), backend.http());
     for modality in MODALITIES {
       backend.load_models(modality);
     }
     backend.refresh_session();
-    let mut app = Self { cache, player, toasts: Toasts::default(), catalog: Catalog::default(), user: None, credits: None, page: saved.page, enter_to_generate: saved.enter_to_generate, view_mode: saved.view_mode, autoplay: saved.autoplay, sidebar_open: saved.sidebar_open, image: CreateImagePage::new(saved.image), video: CreateVideoPage::new(saved.video), audio: CreateAudioPage::new(saved.audio), library: FeedStore::default(), ratios: RatioCache::default(), prompts: HashMap::new(), prompt_records: HashMap::new(), requested_prompts: HashSet::new(), pending_recreate: None, batch_kinds: HashMap::new(), lightbox: None, picker: None, login: None, characters_modal: None, characters: Vec::new(), pending_characters: Vec::new(), settings_open: false, provider_setup: None, midjourney_login: None, fal_key_input: String::new(), preview: None, requests: Vec::new(), screenshot: ScreenshotRequest::from_env(), next_poll: 0.0, next_credits: CREDITS_INTERVAL, models_retry_at: None, backend };
+    let mut app = Self {
+      branding,
+      brand_icon,
+      cache,
+      player,
+      toasts: Toasts::default(),
+      catalog: Catalog::default(),
+      user: None,
+      credits: None,
+      page: saved.page,
+      enter_to_generate: saved.enter_to_generate,
+      view_mode: saved.view_mode,
+      autoplay: saved.autoplay,
+      sidebar_open: saved.sidebar_open,
+      image: CreateImagePage::new(saved.image),
+      video: CreateVideoPage::new(saved.video),
+      audio: CreateAudioPage::new(saved.audio),
+      library: FeedStore::default(),
+      ratios: RatioCache::default(),
+      prompts: HashMap::new(),
+      prompt_records: HashMap::new(),
+      requested_prompts: HashSet::new(),
+      pending_recreate: None,
+      batch_kinds: HashMap::new(),
+      lightbox: None,
+      picker: None,
+      login: None,
+      characters_modal: None,
+      characters: Vec::new(),
+      pending_characters: Vec::new(),
+      settings_open: false,
+      provider_setup: None,
+      #[cfg(not(target_env = "ohos"))]
+      midjourney_login: None,
+      fal_key_input: String::new(),
+      preview: None,
+      requests: Vec::new(),
+      screenshot: ScreenshotRequest::from_env(),
+      next_poll: 0.0,
+      next_credits: CREDITS_INTERVAL,
+      models_retry_at: None,
+      backend,
+    };
     app.restore_provider_jobs();
     // Diagnostics: `ARTCRAFT_OPEN=settings` or `midjourney-login` opens that dialog at launch.
     match std::env::var("ARTCRAFT_OPEN").as_deref() {
@@ -141,6 +207,18 @@ impl ArtcraftApp {
       _ => {},
     }
     app
+  }
+
+  /// Runs one frame inside an active egui pass. The host handles platform output and storage.
+  /// Desktop Midjourney login requires the `eframe::App` path for its native window handle.
+  pub fn show(&mut self, ctx: &egui::Context) {
+    #[cfg(not(target_env = "ohos"))]
+    if self.midjourney_login.take().is_some() {
+      self.toasts.error("Midjourney sign-in requires the eframe host window.");
+    }
+    self.tick(ctx);
+    let mut ui = Ui::new(ctx.clone(), Id::new("artcraft-root"), egui::UiBuilder::new().max_rect(ctx.content_rect()));
+    self.draw(&mut ui, None);
   }
 
   /// Pending cards for the Midjourney and fal jobs still running.
@@ -417,6 +495,9 @@ impl ArtcraftApp {
         self.characters_modal = Some(CharactersModal::new());
       },
       AppRequest::PlayExternally(url) => {
+        #[cfg(target_env = "ohos")]
+        ctx.open_url(egui::OpenUrl::new_tab(&url));
+        #[cfg(not(target_env = "ohos"))]
         if let Err(err) = open::that(&url) {
           self.toasts.error(format!("Couldn't open the file: {err}"));
         }
@@ -448,6 +529,7 @@ impl ArtcraftApp {
     }
   }
 
+  #[cfg(not(target_env = "ohos"))]
   fn download(&mut self, tokens: &[String]) {
     let items: Vec<FeedItem> = tokens.iter().filter_map(|t| self.find_item(t).cloned()).collect();
     match items.as_slice() {
@@ -470,6 +552,11 @@ impl ArtcraftApp {
         }
       },
     }
+  }
+
+  #[cfg(target_env = "ohos")]
+  fn download(&mut self, _tokens: &[String]) {
+    self.toasts.error("Saving files requires a native OpenHarmony file picker.");
   }
 
   fn find_item(&self, token: &str) -> Option<&FeedItem> {
@@ -572,11 +659,11 @@ impl ArtcraftApp {
   /// The title bar and the sidebar (both on the window chrome).
   fn shell(&mut self, ui: &mut Ui) {
     let account = Account { username: self.user.as_ref().map(|u| u.username.as_str()), display_name: self.user.as_ref().map(|u| u.display_name.as_str()).filter(|n| !n.is_empty()), credits: self.credits };
-    let mark = creator_icons::texture(ui.ctx(), "artcraft");
+    let mark = self.brand_icon.clone();
     let mut actions = Vec::new();
     let chrome = egui::Frame::NONE.fill(theme::CHROME);
     egui::Panel::top("titlebar").exact_size(shell::TITLEBAR_HEIGHT).resizable(false).frame(chrome).show(ui, |ui| {
-      actions.extend(shell::titlebar(ui, &account, &mark));
+      actions.extend(shell::titlebar(ui, &account, &mark, self.branding.name));
     });
     if self.sidebar_open {
       egui::Panel::left("sidebar").exact_size(shell::SIDEBAR_WIDTH).resizable(false).frame(chrome).show(ui, |ui| {
@@ -625,12 +712,12 @@ impl ArtcraftApp {
       panel.show(ui, |ui| {
         ui.set_min_size(ui.available_size());
         egui::Panel::top("page-header").exact_size(shell::HEADER_HEIGHT).resizable(false).frame(egui::Frame::NONE).show(ui, |ui| {
-          header_action = shell::page_header(ui, self.page, toggles);
+          header_action = shell::page_header(ui, self.page, toggles, self.branding.name);
         });
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
           let mut env = env!(self, ctx);
           match self.page {
-            Page::Home => open_page = other::home(ui, env.signed_in, env.requests),
+            Page::Home => open_page = other::home(ui, env.signed_in, env.requests, self.branding.name),
             Page::CreateImage => self.image.ui(ui, &mut env),
             Page::CreateVideo => self.video.ui(ui, &mut env),
             Page::CreateAudio => self.audio.ui(ui, &mut env),
@@ -662,7 +749,7 @@ impl ArtcraftApp {
     }
   }
 
-  fn overlays(&mut self, ctx: &egui::Context, frame: &eframe::Frame) {
+  fn overlays(&mut self, ctx: &egui::Context, _frame: Option<&eframe::Frame>) {
     if let Some((kind, token)) = self.lightbox.as_ref().map(|lb| (lb.kind, lb.token.clone())) {
       let key = if self.page == Page::Library { FeedKey::Library } else { FeedKey::of(kind) };
       let order = self.feed(key).ordered_tokens();
@@ -744,11 +831,15 @@ impl ArtcraftApp {
         }
       }
     }
-    if self.settings_open && self.midjourney_login.is_none() {
+    #[cfg(not(target_env = "ohos"))]
+    let provider_login_open = self.midjourney_login.is_some();
+    #[cfg(target_env = "ohos")]
+    let provider_login_open = false;
+    if self.settings_open && !provider_login_open {
       let username = self.user.as_ref().map(|u| u.username.clone());
       let accounts = self.backend.accounts();
       let view = AccountsView { midjourney: accounts.midjourney_account(), fal_key_hint: accounts.fal_key_hint() };
-      match settings_dialog(ctx, &mut self.enter_to_generate, username.as_deref(), self.credits, &view, &mut self.fal_key_input, self.backend.data_root()) {
+      match settings_dialog(ctx, &mut self.enter_to_generate, username.as_deref(), self.credits, &view, &mut self.fal_key_input, self.backend.data_root(), &self.branding) {
         Some(SettingsAction::Close) => self.settings_open = false,
         Some(SettingsAction::SignOut) => {
           self.settings_open = false;
@@ -762,7 +853,7 @@ impl ArtcraftApp {
         None => {},
       }
     }
-    if let Some(provider) = self.provider_setup.filter(|_| self.midjourney_login.is_none()) {
+    if let Some(provider) = self.provider_setup.filter(|_| !provider_login_open) {
       match setup_dialog(ctx, provider, &mut self.fal_key_input) {
         Some(SetupAction::Close) => self.provider_setup = None,
         Some(SetupAction::ConnectMidjourney) => {
@@ -776,7 +867,8 @@ impl ArtcraftApp {
         None => {},
       }
     }
-    if let Some(login) = &mut self.midjourney_login {
+    #[cfg(not(target_env = "ohos"))]
+    if let (Some(login), Some(frame)) = (&mut self.midjourney_login, _frame) {
       match login.show(ctx, frame) {
         Some(LoginEvent::Captured(cookies)) => {
           self.midjourney_login = None;
@@ -809,8 +901,12 @@ impl ArtcraftApp {
   /// Connects or disconnects a provider account.
   fn account_action(&mut self, action: AccountAction) {
     match action {
+      #[cfg(not(target_env = "ohos"))]
       AccountAction::ConnectMidjourney => self.midjourney_login = Some(MidjourneyLogin::new(self.backend.data_root())),
+      #[cfg(not(target_env = "ohos"))]
       AccountAction::DisconnectMidjourney => self.backend.disconnect_midjourney(),
+      #[cfg(target_env = "ohos")]
+      AccountAction::ConnectMidjourney | AccountAction::DisconnectMidjourney => self.toasts.error("Direct Midjourney accounts are unavailable on OpenHarmony."),
       AccountAction::SaveFalKey => match self.backend.accounts().set_fal_key(&self.fal_key_input) {
         Ok(()) => {
           self.fal_key_input.clear();
@@ -852,6 +948,9 @@ impl ArtcraftApp {
       },
       LightboxAction::CopyPrompt(text) => self.handle_request(ctx, AppRequest::CopyText(text)),
       LightboxAction::Play(url) => {
+        #[cfg(target_env = "ohos")]
+        ctx.open_url(egui::OpenUrl::new_tab(&url));
+        #[cfg(not(target_env = "ohos"))]
         if let Err(err) = open::that(&url) {
           self.toasts.error(format!("Couldn't open the video: {err}"));
         }
@@ -860,15 +959,15 @@ impl ArtcraftApp {
   }
 }
 
-impl eframe::App for ArtcraftApp {
-  fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+impl ArtcraftApp {
+  fn tick(&mut self, ctx: &egui::Context) {
     for event in self.backend.drain() {
       self.handle_event(ctx, event);
     }
     self.timers(ctx);
   }
 
-  fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+  fn draw(&mut self, ui: &mut Ui, frame: Option<&eframe::Frame>) {
     let ctx = ui.ctx().clone();
     self.cache.poll(&ctx);
     if let Some(err) = self.player.poll() {
@@ -887,6 +986,16 @@ impl eframe::App for ArtcraftApp {
     if let Some(shot) = &mut self.screenshot {
       shot.tick(&ctx);
     }
+  }
+}
+
+impl eframe::App for ArtcraftApp {
+  fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    self.tick(ctx);
+  }
+
+  fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+    self.draw(ui, Some(frame));
   }
 
   fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -922,29 +1031,24 @@ impl ScreenshotRequest {
     ctx.request_repaint();
     if !self.requested && ctx.input(|i| i.time) >= Self::SETTLE_SECS {
       self.requested = true;
-      ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
-    }
-    let image = ctx.input(|i| {
-      i.raw.events.iter().find_map(|e| match e {
-        egui::Event::Screenshot { image, .. } => Some(image.clone()),
-        _ => None,
-      })
-    });
-    if let Some(image) = image {
-      let [w, h] = image.size;
-      let pixels: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-      match image::RgbaImage::from_raw(w as u32, h as u32, pixels).map(|img| img.save(&self.path)) {
-        Some(Ok(())) => log::info!("Saved a screenshot to {}", self.path.display()),
-        other => log::error!("Couldn't save the screenshot: {other:?}"),
-      }
-      if self.exit {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-      }
+      let (path, exit, ctx) = (self.path.clone(), self.exit, ctx.clone());
+      ctx.clone().request_screenshot(move |image| {
+        let [w, h] = image.size;
+        let pixels: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
+        match image::RgbaImage::from_raw(w as u32, h as u32, pixels).map(|img| img.save(&path)) {
+          Some(Ok(())) => log::info!("Saved a screenshot to {}", path.display()),
+          other => log::error!("Couldn't save the screenshot: {other:?}"),
+        }
+        if exit {
+          ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+      });
     }
   }
 }
 
 /// `artcraft_<token>.<ext>`, the extension taken from the URL.
+#[cfg(not(target_env = "ohos"))]
 fn file_name_for(item: &FeedItem) -> String {
   let fallback = match item.kind {
     MediaKind::Image => "png",
@@ -953,4 +1057,60 @@ fn file_name_for(item: &FeedItem) -> String {
   };
   let ext = item.full_url.rsplit('.').next().filter(|e| e.len() <= 4 && e.chars().all(|c| c.is_ascii_alphanumeric())).unwrap_or(fallback);
   format!("artcraft_{}.{ext}", item.token)
+}
+
+#[cfg(test)]
+mod embedding_tests {
+  use std::net::TcpListener;
+
+  use egui_kittest::Harness;
+  use egui_kittest::kittest::Queryable;
+
+  use super::*;
+
+  const BRANDING: Branding = Branding { name: "Visrune", icon_png: include_bytes!("../../crates/desktop/artcraft/icons/icon.png"), attribution: "Independent host attribution" };
+
+  #[test]
+  fn host_branding_and_storage_work_with_eframe_and_direct_egui() {
+    // Keep requests on a reserved loopback port; never contact the production service.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    for direct_egui in [false, true] {
+      let dir = tempfile::tempdir().unwrap();
+      let root = dir.path().to_path_buf();
+      std::fs::create_dir_all(root.join("settings")).unwrap();
+      std::fs::create_dir_all(root.join("credentials")).unwrap();
+      std::fs::write(root.join("settings/env_configs.json"), serde_json::json!({ "storyteller_host": "localhost", "storyteller_port": listener.local_addr().unwrap().port() }).to_string()).unwrap();
+      // Prevent importing the developer's desktop session during this test.
+      std::fs::write(root.join("credentials/native_session.json"), r#"{"session":"embedding-test"}"#).unwrap();
+      let mut harness = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut Option<ArtcraftApp>| {
+          let Some(app) = app else {
+            let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+            let mut created = ArtcraftApp::with_branding(&cc, BRANDING, &root);
+            created.page = Page::Home;
+            created.settings_open = true;
+            *app = Some(created);
+            return; // Fonts are installed at the beginning of the next pass.
+          };
+          if direct_egui {
+            app.show(ui.ctx());
+          } else {
+            let mut frame = eframe::Frame::_new_kittest();
+            eframe::App::logic(app, ui.ctx(), &mut frame);
+            eframe::App::ui(app, ui, &mut frame);
+          }
+        },
+        None,
+      );
+      harness.run_steps(2);
+      harness.get_by_label(&format!("Visrune native {}", env!("CARGO_PKG_VERSION")));
+      harness.get_by_label(BRANDING.attribution);
+      let app = harness.state().as_ref().unwrap();
+      assert_eq!(app.backend.data_root(), root);
+      assert_eq!(app.backend.accounts().fal_key(), None);
+      app.backend.accounts().set_fal_key("host-test-key").unwrap();
+      assert_eq!(std::fs::read_to_string(root.join("credentials/fal.api_key.txt")).unwrap(), "host-test-key");
+      assert!(app.brand_icon.size()[0] > 1, "the host PNG was decoded");
+    }
+  }
 }

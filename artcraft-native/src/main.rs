@@ -2,16 +2,7 @@
 
 //! ArtCraft, natively: an egui desktop app over the ArtCraft API (no Tauri, no webview).
 
-mod app;
-mod backend;
-mod feed;
-mod models;
-mod overlays;
-mod pages;
-mod prompt_box;
-mod shell;
-mod theme;
-mod ui;
+use artcraft_native::{ArtcraftApp, Branding};
 
 const APP_ID: &str = "ai.artcraft.native";
 
@@ -24,12 +15,12 @@ fn main() -> eframe::Result {
   // The app draws its own title bar; macOS keeps its traffic lights over it.
   viewport = if cfg!(target_os = "macos") { viewport.with_fullsize_content_view(true).with_titlebar_shown(false).with_title_shown(false) } else { viewport.with_decorations(false) };
   let options = eframe::NativeOptions { viewport, persist_window: true, ..Default::default() };
-  eframe::run_native("ArtCraft", options, Box::new(|cc| Ok(Box::new(app::ArtcraftApp::new(cc)))))
+  eframe::run_native("ArtCraft", options, Box::new(|cc| Ok(Box::new(ArtcraftApp::new(cc)))))
 }
 
 /// The window and taskbar icon.
 fn app_icon() -> Option<egui::IconData> {
-  const ICON: &[u8] = include_bytes!("../../crates/desktop/artcraft/icons/icon.png");
+  const ICON: &[u8] = Branding::UPSTREAM.icon_png;
   let rgba = image::load_from_memory(ICON).ok()?.into_rgba8();
   Some(egui::IconData { width: rgba.width(), height: rgba.height(), rgba: rgba.into_raw() })
 }

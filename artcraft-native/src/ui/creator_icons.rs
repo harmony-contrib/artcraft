@@ -19,6 +19,7 @@ macro_rules! service_svg {
 fn svg_for_creator(creator: &str) -> &'static [u8] {
   match creator {
     "alibaba" => service_svg!("alibaba"),
+    #[cfg(feature = "upstream-branding")]
     "artcraft" => service_svg!("artcraft"),
     "black_forest_labs" | "blackforestlabs" | "bfl" => service_svg!("blackforestlabs"),
     "bytedance" => service_svg!("bytedance"),

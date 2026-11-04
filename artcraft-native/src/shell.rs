@@ -140,7 +140,7 @@ pub enum ShellAction {
 
 /// The custom title bar: the ArtCraft mark (home) and the sidebar toggle at the left, the
 /// account and (on Windows and Linux) the caption buttons at the right; the rest drags the window.
-pub fn titlebar(ui: &mut Ui, account: &Account<'_>, mark: &egui::TextureHandle) -> Option<ShellAction> {
+pub fn titlebar(ui: &mut Ui, account: &Account<'_>, mark: &egui::TextureHandle, app_name: &str) -> Option<ShellAction> {
   let mut action = None;
   window::title_bar_drag(ui);
   let rect = ui.max_rect();
@@ -153,8 +153,8 @@ pub fn titlebar(ui: &mut Ui, account: &Account<'_>, mark: &egui::TextureHandle) 
   if hovered {
     ui.painter().rect_filled(mark_rect, theme::RADIUS, theme::WASH);
   }
-  ui.painter().image(mark.id(), Rect::from_center_size(mark_rect.center(), vec2(18.0, 16.0)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), theme::ACCENT);
-  if mark_resp.on_hover_text("Home").on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+  ui.painter().image(mark.id(), Rect::from_center_size(mark_rect.center(), vec2(20.0, 20.0)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+  if mark_resp.on_hover_text(app_name).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
     action = Some(ShellAction::Navigate(Page::Home));
   }
   if widgets::ghost(ui, Icon::PanelLeft, None, "Toggle Sidebar", false).clicked() {
@@ -298,7 +298,7 @@ pub struct FeedToggles {
 
 /// The content panel's header: breadcrumbs, and the select, previews and grid/list toggles on
 /// feed pages.
-pub fn page_header(ui: &mut Ui, page: Page, feed_toggles: Option<FeedToggles>) -> Option<ShellAction> {
+pub fn page_header(ui: &mut Ui, page: Page, feed_toggles: Option<FeedToggles>, app_name: &str) -> Option<ShellAction> {
   let mut action = None;
   let rect = ui.max_rect();
   ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, theme::hairline());
@@ -306,7 +306,7 @@ pub fn page_header(ui: &mut Ui, page: Page, feed_toggles: Option<FeedToggles>) -
   let ui = &mut bar;
   ui.spacing_mut().item_spacing.x = 8.0;
   let (section, leaf) = page.crumbs();
-  widgets::hud(ui, section, theme::MUTED);
+  widgets::hud(ui, if page == Page::Home { app_name } else { section }, theme::MUTED);
   let (chev, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
   icons::paint(ui.painter(), chev, Icon::ChevronRight, theme::FAINT);
   let galley = widgets::caps(ui, leaf, theme::HUD_SIZE, theme::mono(), theme::HUD_SPACING, theme::BG);

@@ -12,7 +12,9 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 
 /// The Tauri app's identifier: its cookie jar lives in `<cache dir>/<identifier>/.cookies`.
+#[cfg(all(feature = "upstream-branding", not(target_env = "ohos")))]
 const TAURI_APP_IDENTIFIER: &str = "ai.artcraft.app";
+#[cfg(all(feature = "upstream-branding", not(target_env = "ohos")))]
 const TAURI_COOKIES_FILENAME: &str = ".cookies";
 const CREDENTIALS_FILENAME: &str = "native_session.json";
 
@@ -31,6 +33,7 @@ impl Credentials {
 }
 
 /// `~/Artcraft`, shared with the Tauri app (`AppDataRoot`).
+#[cfg(feature = "upstream-branding")]
 pub fn data_root() -> PathBuf {
   directories::UserDirs::new().map(|d| d.home_dir().to_path_buf()).unwrap_or_else(|| PathBuf::from(".")).join("Artcraft")
 }
@@ -61,7 +64,7 @@ pub fn load(root: &Path) -> Option<Credentials> {
       Err(err) => warn!("Ignoring unreadable {}: {err}", path.display()),
     }
   }
-  let imported = import_tauri_cookies()?;
+  let imported = import_tauri_cookies(root)?;
   info!("Imported the ArtCraft login from the desktop app's cookie jar");
   save(root, &imported);
   Some(imported)
@@ -90,7 +93,11 @@ fn credentials_path(root: &Path) -> PathBuf {
 
 /// Reads `session` and `visitor` for the ArtCraft API from the Tauri HTTP plugin's jar: a JSON
 /// array of `cookie_store` cookies (`{"raw_cookie": "...", "domain": {...}, "expires": {...}}`).
-fn import_tauri_cookies() -> Option<Credentials> {
+#[cfg(all(feature = "upstream-branding", not(target_env = "ohos")))]
+fn import_tauri_cookies(root: &Path) -> Option<Credentials> {
+  if root != data_root() {
+    return None;
+  }
   let path = directories::BaseDirs::new()?.cache_dir().join(TAURI_APP_IDENTIFIER).join(TAURI_COOKIES_FILENAME);
   let text = fs::read_to_string(&path).ok()?;
   let cookies: Vec<serde_json::Value> = serde_json::from_str(&text).ok()?;
@@ -115,4 +122,9 @@ fn import_tauri_cookies() -> Option<Credentials> {
     }
   }
   (!creds.session.is_empty()).then_some(creds)
+}
+
+#[cfg(any(not(feature = "upstream-branding"), target_env = "ohos"))]
+fn import_tauri_cookies(_root: &Path) -> Option<Credentials> {
+  None
 }
