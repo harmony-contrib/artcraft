@@ -5,7 +5,7 @@ use egui::{Align2, Color32, FontId, Id, Key, Rect, Sense, Ui, pos2, vec2};
 
 use crate::backend::audio::AudioPlayer;
 use crate::backend::media_cache::{Lookup, MediaCache};
-#[cfg(not(target_env = "ohos"))]
+#[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
 use crate::backend::video::{self, VideoPlayer};
 use crate::backend::wire::Prompt;
 use crate::feed::grid::ModelNames;
@@ -25,7 +25,7 @@ pub struct Lightbox {
   confirm_delete: bool,
   prompt_expanded: bool,
   /// The in-app player for videos (when FFmpeg is installed).
-  #[cfg(not(target_env = "ohos"))]
+  #[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
   player: Option<VideoPlayer>,
 }
 
@@ -49,7 +49,7 @@ impl Lightbox {
       token,
       confirm_delete: false,
       prompt_expanded: false,
-      #[cfg(not(target_env = "ohos"))]
+      #[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
       player: None,
     }
   }
@@ -99,7 +99,7 @@ impl Lightbox {
   #[allow(clippy::too_many_arguments)]
   fn media(&mut self, ui: &mut Ui, rect: Rect, item: &FeedItem, cache: &mut MediaCache, audio: &mut AudioPlayer, prev: &Option<String>, next: &Option<String>, actions: &mut Vec<LightboxAction>) {
     if item.kind == MediaKind::Audio {
-      #[cfg(not(target_env = "ohos"))]
+      #[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
       {
         self.player = None;
       }
@@ -108,7 +108,7 @@ impl Lightbox {
       self.nav_buttons(ui, rect, prev, next, actions);
       return;
     }
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
     if item.kind == MediaKind::Video && video::ffmpeg_available() {
       if self.player.as_ref().is_none_or(|p| p.url() != item.full_url) {
         self.player = Some(VideoPlayer::new(&item.full_url));
@@ -123,7 +123,7 @@ impl Lightbox {
       self.nav_buttons(ui, rect, prev, next, actions);
       return;
     }
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
     {
       self.player = None;
     }

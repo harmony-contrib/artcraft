@@ -1,12 +1,12 @@
 //! Everything that talks to the ArtCraft API. Calls run on a tokio runtime and report back as
 //! [`Event`]s, which the UI drains once per frame; nothing here blocks the UI thread.
 
-#[cfg_attr(target_env = "ohos", path = "audio_ohos.rs")]
+#[cfg_attr(any(target_env = "ohos", not(feature = "upstream-branding")), path = "audio_ohos.rs")]
 pub mod audio;
 pub mod media_cache;
 pub mod providers;
 pub mod session;
-#[cfg(not(target_env = "ohos"))]
+#[cfg(all(not(target_env = "ohos"), feature = "upstream-branding"))]
 pub mod video;
 pub mod wire;
 

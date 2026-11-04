@@ -1103,7 +1103,7 @@ mod embedding_tests {
         None,
       );
       harness.run_steps(2);
-      harness.get_by_label(&format!("Visrune native {}", env!("CARGO_PKG_VERSION")));
+      harness.get_by_label(&format!("Visrune native {}", std::env!("CARGO_PKG_VERSION")));
       harness.get_by_label(BRANDING.attribution);
       let app = harness.state().as_ref().unwrap();
       assert_eq!(app.backend.data_root(), root);

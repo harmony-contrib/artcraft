@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["upstream-branding"]
-upstream-branding = []
+upstream-branding = ["dep:rodio"]
 
 [[bin]]
 name = "artcraft-native"
@@ -55,7 +55,7 @@ midjourney_client.workspace = true
 eframe = { version = "0.37", default-features = false, features = ["accesskit", "wayland", "x11"] }
 open = "5"
 rfd = "0.16"
-rodio = { version = "0.20", default-features = false, features = ["symphonia-all"] }
+rodio = { version = "0.20", default-features = false, features = ["symphonia-all"], optional = true }
 
 # Pasting images from the clipboard (egui's own clipboard support is text only).
 arboard = { version = "3", default-features = false, features = ["image-data"] }
