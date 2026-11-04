@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["upstream-branding"]
-upstream-branding = ["dep:rodio"]
+upstream-branding = ["dep:rodio", "eframe/glow"]
 
 [[bin]]
 name = "artcraft-native"
@@ -29,7 +29,7 @@ anyhow.workspace = true
 cookie.workspace = true
 chrono.workspace = true
 directories = "6.0.0"
-eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "persistence", "links"] }
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "persistence", "links"] }
 egui = "0.37"
 enums.workspace = true
 # SVG creator icons are rasterized directly with resvg below; egui_extras/svg pins resvg 0.45.
